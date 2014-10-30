@@ -1,0 +1,169 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Stelligent mini project template. Install Linux VM, configure it",
+
+  "Parameters" : {
+    "InstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "t1.micro",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","m3.xlarge","m3.2xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type" : "String",
+      "Default" : "stelligent"
+    },
+
+    "SSHLocation" : {
+      "Description" : "The IP address range that can be used to SSH to the EC2 instances",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+    },
+    "DesiredEIP" : {
+      "Description" : "Desired ElasticIP for instance",
+      "Type": "String",
+      "MinLength": "7",
+      "MaxLength": "15",
+      "Default": "54.200.224.242",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+      "ConstraintDescription": "must be a valid IP of the form x.x.x.x."
+    }
+
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
+      "m1.small"    : { "Arch" : "64" },
+      "m1.medium"   : { "Arch" : "64" },
+      "m1.large"    : { "Arch" : "64" },
+      "m1.xlarge"   : { "Arch" : "64" },
+      "m2.xlarge"   : { "Arch" : "64" },
+      "m2.2xlarge"  : { "Arch" : "64" },
+      "m2.4xlarge"  : { "Arch" : "64" },
+      "m3.xlarge"   : { "Arch" : "64" },
+      "m3.2xlarge"  : { "Arch" : "64" },
+      "c1.medium"   : { "Arch" : "64" },
+      "c1.xlarge"   : { "Arch" : "64" }
+    },
+
+    "AWSRegionArch2AMI" : {
+      "us-west-2"          : { "64" : "ami-55a7ea65" }
+    }
+  },
+
+  "Resources" : {
+
+    "Ec2Instance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "config" : {
+            "packages" : {
+              "yum" : {
+                "httpd" : []
+              }
+            },
+            "files": { 
+              "/var/www/html/index.html" : {
+                "content" : { "Fn::Join" : [ "", [
+"<html><head><title>Hello, Stelligent</title></head>",
+"<body><h1>Hello, Stelligent!</h1></body></html>" ] ] },
+                "mode" : "0644",
+                "owner" : "root",
+                "group" : "root"
+             
+              }
+            },
+            "services" : {
+              "sysvinit" : {
+                "httpd" : {
+                  "enabled" : "true",
+                  "ensureRunning" : "true"
+                }
+              }
+            },
+            "groups" : { },
+            "users" : { },
+            "commands" : {
+              "yy-motd" : {
+                 "command" : "echo \"$MOTD\" > /etc/motd",
+                 "env" : { "MOTD" : "I am spawned from stelligent.cf" },
+                 "cwd" : "/tmp",
+                 "test" : "/usr/bin/test \"! -e /etc/motd\"",
+                 "ignoreErrors" : "false"
+              }
+            }
+          }
+        },
+        "AWS::CloudFormation::Authentication" : {
+          "rolebased" : {
+            "type" : "S3",
+            "roleName" : "s3Role"
+          }
+        }
+      },
+
+      "Properties" : {
+        "BlockDeviceMappings" : [ {
+          "DeviceName" : "/dev/sda1",
+          "Ebs" : { "VolumeSize" : "30" }
+        } ],
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "IamInstanceProfile"  : "s3Role",
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" },
+                                          "Arch" ] } ] },
+        "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash\n",
+          "yum update -y aws-cfn-bootstrap\n",
+          "yum-config-manager --enable epel\n",
+          "/opt/aws/bin/cfn-init -v -s ", { "Ref" : "AWS::StackId" }, " -r Ec2Instance ",
+          "         --region ", { "Ref" : "AWS::Region" }, ";\n"
+        ]]}}        
+      }
+    },
+
+    "InstanceSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access on the inbound port",
+        "SecurityGroupIngress" :
+          [{ "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : { "Ref" : "SSHLocation"} },
+           { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0" },
+           { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0" }
+          ]
+      }
+    },
+
+    "EIPAssociation" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "EIP" : { "Ref" : "DesiredEIP" },
+        "InstanceId" : { "Ref" : "Ec2Instance" }
+      }
+    }
+
+  },
+
+  "Outputs" : {
+    "InstanceId" : {
+      "Description" : "InstanceId of the newly created EC2 instance",
+      "Value" : { "Ref" : "Ec2Instance" }
+    },
+    "URL" : {
+      "Description" : "Public (Elastic) IP Address",
+      "Value" : { "Ref" : "DesiredEIP" }
+    }
+  }
+}
