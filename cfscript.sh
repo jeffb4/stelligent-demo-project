@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# For security these should instead use aws cli credential
-# profiles, hardcoding for demo
-
-AWS_ACCESS_KEY_ID="AKIAJXZDMMMBNZCHKOUA"
-AWS_SECRET_ACCESS_KEY="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"
-
 CF_PATH="${BASH_SOURCE[0]}";
 if ([ -h "${CF_PATH}" ]) then
     while([ -h "${CF_PATH}" ]) do CF_PATH=$(readlink "${CF_PATH}"); done
@@ -81,8 +75,8 @@ esac
 for c in $STACK; do
 
   if [ "${UPDATE_STACKS}" = "true" ]; then
-    awscli="env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-    AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+    awscli="env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY \
+    AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
     aws  \
     --region us-west-2 \
     cloudformation update-stack \
@@ -90,8 +84,8 @@ for c in $STACK; do
     --template-body $BASEDIR/$c.cf \
     $EXTRAPARAMS"
   else
-    awscli="env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-    AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+    awscli="env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY \
+    AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
     aws \
     --region us-west-2 \
     cloudformation create-stack \

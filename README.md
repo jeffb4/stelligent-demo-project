@@ -16,7 +16,7 @@ Usage
 
 Note that the connection should time out
 
-    bash ./cfscript.sh -f
+    env AWS_ACCESS_KEY=foo AWS_SECRET_ACCESS_KEY=bar ./cfscript.sh -f
 
     sleep 120
 
@@ -56,9 +56,10 @@ are injected into your instance securely, and then a proper SCM
 is kicked off. For this demonstration case, the addition of a
 SCM was a bit overmuch.
 
-This script hard codes AWS creds. My original script instead
-hardcoded profile names, and users were expect to create
-~/.aws/config files with credentials linked to their IAM accounts.
+This script requires AWS creds be passed on the command line.
+Previously, I hardcoded profile names, and users were expect to
+create ~/.aws/config files with credentials linked to their IAM
+accounts.
 
 Defining a custom policy for this for the stelligent-demo user
 I created in IAM was a huge pain. A large part of this pain
